@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+require 'trollop'
+
+require 'trezor/agent'
+require 'trezor/version'
+
+options = Trollop.options do
+  version "Ruby Trezor Agent #{Trezor::VERSION}"
+
+  opt :identity_file, 'Identity file', default: '~/.ssh/config'
+  opt :ecdsa_curve_name, 'Specify ECDSA curve name: ed25519, nist256p1', default: 'nist256p1'
+  opt :socket_path, 'Path to the UNIX domain socket of the agent',
+    default: 'A new temporary socket will be created'
+end
+
+key_manager = Trezor::KeyManager.new(options[:identity_file])
+key_manager.each { |i| i.curve_name = options[:ecdsa_curve_name] } if options[:ecdsa_curve_name_given]
+
+unless ARGV.any?
+  key_manager.each do |identity|
+    puts identity.export_public_key
+  end
+  exit
+end
+
+socket_path =
+  if options[:socket_path_given]
+    options[:socket_path]
+  else
+    Dir::Tmpname.create('trezor-agent.sock') { }
+  end
+
+server = Thread.new do
+  Thread.current.abort_on_exception = true
+  Trezor::Agent.new(socket_path: socket_path, key_manager: key_manager).run
+end
+
+env = { 'SSH_AUTH_SOCK' => socket_path, 'SSH_AGENT_PID' => Process.pid.to_s }
+Process.wait(Process.spawn(env, *ARGV))
+server.kill
