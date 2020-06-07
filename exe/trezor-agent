@@ -1,11 +1,11 @@
 #!/usr/bin/env ruby
 
-require 'trollop'
+require 'optimist'
 
 require 'trezor/agent'
 require 'trezor/version'
 
-options = Trollop.options do
+options = Optimist.options do
   version "Ruby Trezor Agent #{Trezor::VERSION}"
 
   opt :identity_file, 'Identity file', default: '~/.ssh/config'
